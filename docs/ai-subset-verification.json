@@ -1,0 +1,12 @@
+{
+  "version": "0.5.0",
+  "checkedAt": "2026-10-02T13:59:34.820Z",
+  "syntheticOnly": true,
+  "endpoint": "/minimize-context",
+  "status": 200,
+  "keepIds": [
+    "b0",
+    "b1"
+  ],
+  "error": null
+}

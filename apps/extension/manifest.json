@@ -1,0 +1,46 @@
+{
+  "manifest_version": 3,
+  "name": "PrivacyShield AI",
+  "version": "0.6.0",
+  "description": "A context firewall for safer AI conversations, tab presentations and content sharing.",
+  "minimum_chrome_version": "116",
+  "permissions": [
+    "activeTab",
+    "scripting",
+    "storage",
+    "sidePanel",
+    "clipboardWrite"
+  ],
+  "optional_host_permissions": [
+    "http://127.0.0.1/*",
+    "http://*/*",
+    "https://*/*"
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "PrivacyShield",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "32": "icons/icon32.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "side_panel": {
+    "default_path": "index.html"
+  },
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "content_security_policy": {
+    "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'none'; connect-src 'self' http://127.0.0.1:4318; worker-src 'self'; img-src 'self' data: blob:; style-src 'self'"
+  },
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAq5ir7WoKjyNx0yuupCprmvzz913JLaYkHiTMFNTA9UvW9X2C1D3x6cErlkdFSr9YpHIR9nB//kSVbmzrDERxZ/u2GgOTyBKUVKlJchAHFxH8AE7TNmW28zck5gh5xzsp4tXC1yuYbRSPTTdfjaWf/avhChJrnW5lc5WUbZ829e/X6mii31qniUuhdnccjCG7qjgF8cq7aVI3Bi9D9rOMcODf5+nkPcdMkAnuo9nALze601u0ENzYWBjKLdkUNJAY1qRzhmjuvdR0prTm2cWE40mClDcAPZAWFjQ29VEYja/viAJHN2rB2pE8KfUInbqGR/fU/pqHorheCyrSLtMRCQIDAQAB",
+  "icons": {
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  }
+}

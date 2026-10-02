@@ -1,0 +1,18 @@
+node_modules/
+.env
+.env.*
+!.env.example
+test-results/
+playwright-report/
+.browser-profile/
+
+# Generated release output and local runtime data
+dist/
+# Automated evidence; selected synthetic illustrations are tracked explicitly
+docs/screenshots/
+docs/browser-test-runtime.json
+docs/performance.json
+docs/groq-verification.json
+
+# Superseded local planning document
+docs/PrivacyShield_AI_Vibe_Coding_Master_PRD.md

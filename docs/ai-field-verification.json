@@ -1,0 +1,16 @@
+{
+  "date": "2026-10-02T15:01:36.003Z",
+  "status": 200,
+  "syntheticOnly": true,
+  "submittedFieldLabels": [
+    "Personal name",
+    "Date of birth",
+    "Laptop memory"
+  ],
+  "result": {
+    "privateIds": [
+      "f0",
+      "f1"
+    ]
+  }
+}

@@ -1,0 +1,20 @@
+:root {
+  --canvas: #f2f0ea;
+  --surface: #faf9f5;
+  --surface-strong: #ffffff;
+  --ink: #171b18;
+  --muted: #626961;
+  --subtle: #8c928b;
+  --line: #d7d8d1;
+  --line-strong: #b8bbb3;
+  --night: #111713;
+  --night-soft: #1b241e;
+  --signal: #b8f23c;
+  --signal-dark: #86b81e;
+  --warning: #c56632;
+  --danger: #9f3c31;
+  --success: #315f42;
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --shadow: 0 14px 45px rgba(18, 24, 19, 0.07);
+}
