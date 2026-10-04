@@ -585,3 +585,81 @@ test("local form OCR covers separated personal values and offers opaque or blurr
     await ui.close();
   }
 });
+
+test("local OCR reads ruled application-form cells without covering the public title", async () => {
+  const ui = await context.newPage();
+  try {
+    await ui.goto(`chrome-extension://${id}/index.html?tool=image`);
+    await ui.getByRole("button", { name: "Screenshot", exact: true }).click();
+    const fixture = await ui.evaluate(() => {
+      const c = document.createElement("canvas");
+      c.width = 1200;
+      c.height = 390;
+      const ctx = c.getContext("2d")!;
+      ctx.fillStyle = "white";
+      ctx.fillRect(0, 0, c.width, c.height);
+      ctx.strokeStyle = "#252525";
+      ctx.lineWidth = 1;
+      for (const y of [45, 110, 160, 225, 290, 355]) {
+        ctx.beginPath();
+        ctx.moveTo(20, y);
+        ctx.lineTo(1180, y);
+        ctx.stroke();
+      }
+      ctx.beginPath();
+      ctx.moveTo(640, 160);
+      ctx.lineTo(640, 355);
+      ctx.stroke();
+      ctx.fillStyle = "black";
+      ctx.font = "bold 24px Arial";
+      ctx.fillText("PUBLIC ADMISSION INFORMATION", 40, 32);
+      ctx.font = "22px Arial";
+      ctx.fillText("Application ID: TEST123456", 40, 83);
+      ctx.fillText("Candidate Full Name", 40, 196);
+      ctx.fillText("SYNTHETIC PERSON", 665, 196);
+      ctx.fillText("Date of Birth", 40, 258);
+      ctx.fillText("2001-04-05", 665, 258);
+      ctx.fillText("Laptop specification", 40, 325);
+      ctx.fillText("16 GB RAM", 665, 325);
+      return c.toDataURL().split(",")[1];
+    });
+    await ui.getByLabel("Import screenshot").setInputFiles({
+      name: "synthetic-ruled-form.png",
+      mimeType: "image/png",
+      buffer: Buffer.from(fixture, "base64"),
+    });
+    const requests: string[] = [];
+    ui.on("request", (request) => {
+      if (request.url().startsWith("http")) requests.push(request.url());
+    });
+    await ui.getByRole("button", { name: "Scan with local OCR" }).click();
+    await expect(ui.getByRole("status")).toContainText(
+      "sensitive lines suggested",
+      { timeout: 90000 },
+    );
+    const covered = await ui.evaluate(() => {
+      const ctx = document.querySelector("canvas")!.getContext("2d")!;
+      const isCovered = (x: number, y: number) => {
+        const pixel = ctx.getImageData(x, y, 1, 1).data;
+        return pixel[0] === 16 && pixel[1] === 20 && pixel[2] === 18;
+      };
+      return {
+        applicationId: isCovered(160, 74),
+        name: isCovered(720, 187),
+        birthDate: isCovered(715, 249),
+        publicTitle: isCovered(160, 22),
+        publicSpec: isCovered(720, 315),
+      };
+    });
+    expect(covered).toEqual({
+      applicationId: true,
+      name: true,
+      birthDate: true,
+      publicTitle: false,
+      publicSpec: false,
+    });
+    expect(requests).toEqual([]);
+  } finally {
+    await ui.close();
+  }
+});

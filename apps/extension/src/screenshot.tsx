@@ -2,7 +2,7 @@ import { SemanticReview } from "./semantic-review";
 import { semanticOcrCandidates, splitOcrColumns } from "./semantic-ocr";
 import { confidencePolicy, priority } from "../../../packages/semantic-core";
 import React, { useRef, useState, useEffect } from "react";
-import { createWorker } from "tesseract.js";
+import { createWorker, PSM } from "tesseract.js";
 import { detect } from "../../../packages/privacy-core";
 import { sensitiveOcrLines, type OcrLine } from "../../../packages/field-core";
 import { capture, isExtension } from "./runtime";
@@ -114,6 +114,9 @@ export function Screenshot() {
         return;
       }
       worker.current = w;
+      // Sparse mode reads individual cells in forms instead of merging rows
+      // across ruled table columns. OCR and all pixel work remain on device.
+      await w.setParameters({ tessedit_pageseg_mode: PSM.SPARSE_TEXT });
       const result = await w.recognize(
         image.current!,
         {},
@@ -151,8 +154,8 @@ export function Screenshot() {
       setBoxes((old) => [...old, ...found]);
       setNote(
         found.length
-          ? `${found.length} sensitive lines suggested, including labelled personal-field rows. Inspect photos, signatures and every remaining pixel before export.`
-          : "No supported sensitive line was recognized. This is not a safety result: OCR may have missed the form. Use webpage field scanning and draw covers over unreadable values, photos and signatures.",
+          ? `${found.length} sensitive lines suggested, including labelled personal-field rows. OCR cannot identify faces or signatures: draw covers over them and inspect every remaining pixel before export.`
+          : "No supported sensitive line was recognized. This is not a safety result: OCR may have missed the form. Draw covers over unreadable values, photos and signatures.",
       );
     } catch {
       if (token === generation.current)

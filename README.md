@@ -2,7 +2,7 @@
 
 **Give AI the context it needs. Keep the rest of the page private.**
 
-Version 0.7.2 is a Chrome Manifest V3 extension with two main jobs: **Ask privately** and **Present safely**. A supporting sanitization studio cleans text and screenshots. The interface uses graphite, ivory and restrained green, with no provider-branded chatbot.
+Version 0.7.3 is a Chrome Manifest V3 extension with two main jobs: **Ask privately** and **Present safely**. A supporting sanitization studio cleans text and screenshots. The interface uses graphite, ivory and restrained green, with no provider-branded chatbot.
 
 ## Ask privately
 
@@ -24,7 +24,7 @@ Entire-screen sharing cannot be selectively filtered by this extension. Share th
 
 ## Install on another computer
 
-Download [PrivacyShield v0.7.2](dist/PrivacyShield-v0.7.2.zip) and extract it. In Chrome, open `chrome://extensions`, enable Developer mode, select **Load unpacked**, and choose the extracted `extension` folder. Pin the toolbar icon and open a regular webpage. The ZIP includes license notices in its `licenses` folder.
+Download [PrivacyShield v0.7.3](dist/PrivacyShield-v0.7.3.zip) and extract it. In Chrome, open `chrome://extensions`, enable Developer mode, select **Load unpacked**, and choose the extracted `extension` folder. Pin the toolbar icon and open a regular webpage. The ZIP includes license notices in its `licenses` folder.
 
 To build from source instead, install Node.js and run:
 
@@ -60,3 +60,7 @@ Native Ask Gemini cannot be intercepted by this extension. Attaching original ta
 Present Safely → turn protection on → **Semantic privacy scan** → **Prepare semantic review** → inspect labels and consent → classify → review categories → apply. Uncertain findings need an explicit Protect choice. Optional remembered meanings protect matching future fields locally; clear them in Settings. Existing manual, blur/hide and sharing-reminder workflows remain.
 
 The same optional review is available after context capture in Ask Privately and after local OCR in the screenshot studio. It receives labels with values withheld, never screenshots or the raw page. See [implementation and verification](docs/semantic-engine.md) for exact boundaries, limitations and file changes. Restart the local API after updating. Groq remains the default; `AI_PROVIDER=openrouter` requires an OpenRouter key/model in the private environment. No provider key belongs in the extension.
+
+## Screenshot OCR fix (0.7.3)
+
+Local OCR now reads sparse text in ruled application forms, including separated identifier, name and birth-date cells that the earlier page-layout mode could miss. The image and OCR results stay on device. Photos and signatures are not identified by text OCR; cover them manually and inspect the whole image before exporting.
