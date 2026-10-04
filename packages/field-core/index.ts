@@ -33,7 +33,7 @@ export const fieldLabels: {
   {
     category: "IDENTIFIER",
     pattern:
-      /\b(?:application\s*(?:id|number|no)|apaar\s*(?:id|number|no)?|aadha?r|adha?r|social security|ssn|passport\s*(?:id|number|no)|pan\s*(?:number|no|card)|(?:candidate|student|employee|patient|customer|account|registration|roll)\s*(?:id|number|no))\b/i,
+      /\b(?:application\s*(?:id|number|no)|apaar\s*(?:id|number|no)?|aadha?r|adha?r|social security|ssn|passport\s*(?:id|number|no)|pan\s*(?:number|no|card)|(?:candidate|student|employee|patient|customer|account|registration|roll)\s*(?:uid|id|number|no))\b/i,
     description: "Personal identifier",
   },
   {

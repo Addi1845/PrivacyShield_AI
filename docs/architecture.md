@@ -1,4 +1,4 @@
-# Architecture — 0.6.0
+# Architecture — 0.7.2
 
 ## Task-bounded AI handoff
 
@@ -49,3 +49,7 @@ The production manifest has no required host access, default all-site content sc
 ## Limits
 
 Structural exclusion is heuristic. Unlabeled names, internal project identifiers, imagery and confidential facts may survive in a selected block. Users inspect before external processing and before final handoff. The extension controls its own packet, not native browser AI, connected accounts, desktop sharing or provider retention. IDE/folder controls and enterprise policy enforcement remain future work.
+
+## Hybrid semantic layer
+
+See [semantic-engine.md](semantic-engine.md). Pure semantic-core adds strict shared request/response schemas, local first-pass decisions and monotonic protection policy. semantic-page links generic visible field layouts to temporary element references. Reviewed reduced labels reach /classify-elements; IDs/classifications return and are checked against unchanged local snapshots. Semantic masks coexist with all existing reasons and restore on stop. Confirmed hashed label meanings are bounded in local storage and can add protection in later sessions. Ask context locks survive task rebuilds and appended captures; OCR uses local row geometry for semantic pixel covers. No new host permissions or runtime dependencies were added.

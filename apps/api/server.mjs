@@ -1,6 +1,9 @@
 import http from "node:http";
 import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
+import { validateElements } from "../../packages/semantic-core/schema.mjs";
+import { classifyElements } from "./semantic.mjs";
+export { validateElements } from "../../packages/semantic-core/schema.mjs";
 const labels = {
   USERINFO: "URL contains user information before the real host",
   HTTP: "Unencrypted HTTP",
@@ -106,6 +109,8 @@ export function createApi({
   model = "openai/gpt-oss-20b",
   origin = "",
   providerFetch = fetch,
+  provider = "groq",
+  timeoutMs = 20000,
 } = {}) {
   const limits = new Map();
   return http.createServer(async (req, res) => {
@@ -143,7 +148,8 @@ export function createApi({
     const isReview = req.url === "/review-context";
     const isMinimize = req.url === "/minimize-context";
     const isFields = req.url === "/classify-fields";
-    const usesContext = isReview || isMinimize || isFields;
+    const isElements = req.url === "/classify-elements";
+    const usesContext = isReview || isMinimize || isFields || isElements;
     if ((!isExplain && !usesContext) || req.method !== "POST") {
       send(404, { error: "Not found" });
       return;
@@ -202,6 +208,13 @@ export function createApi({
       });
       return;
     }
+    if (isElements && !validateElements(body)) {
+      send(400, {
+        error:
+          "Only consented, reduced semantic labels are accepted. Source values are forbidden.",
+      });
+      return;
+    }
     if (!key) {
       send(503, {
         error:
@@ -209,9 +222,31 @@ export function createApi({
       });
       return;
     }
+    if (isElements) {
+      try {
+        send(
+          200,
+          await classifyElements(body, {
+            key,
+            model,
+            provider,
+            providerFetch,
+            timeoutMs,
+          }),
+        );
+      } catch {
+        send(503, {
+          error:
+            "Semantic AI scan unavailable. Existing local protection remains active.",
+        });
+      }
+      return;
+    }
     try {
       const upstream = await providerFetch(
-        "https://api.groq.com/openai/v1/chat/completions",
+        provider === "openrouter"
+          ? "https://openrouter.ai/api/v1/chat/completions"
+          : "https://api.groq.com/openai/v1/chat/completions",
         {
           method: "POST",
           headers: {
@@ -381,8 +416,15 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     /* Optional private environment file. */
   }
   createApi({
-    key: process.env.GROQ_API_KEY,
-    model: process.env.GROQ_MODEL,
+    provider: process.env.AI_PROVIDER || "groq",
+    key:
+      process.env.AI_PROVIDER === "openrouter"
+        ? process.env.OPENROUTER_API_KEY
+        : process.env.GROQ_API_KEY,
+    model:
+      process.env.AI_PROVIDER === "openrouter"
+        ? process.env.OPENROUTER_MODEL || ""
+        : process.env.GROQ_MODEL,
     origin: process.env.EXTENSION_ORIGIN,
   }).listen(4318, "127.0.0.1", () =>
     console.log(

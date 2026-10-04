@@ -80,6 +80,8 @@ export type MaskOptions = {
 };
 export type MaskReport = {
   treatment: "replace" | "blur" | "hide";
+  semanticMatches?: number;
+  semanticCategories?: { category: string; count: number }[];
   structuredFields: number;
   fieldTypes?: { label: string; count: number }[];
   active: boolean;
@@ -98,7 +100,7 @@ export async function enableMode(options: MaskOptions): Promise<MaskReport> {
     target: { tabId: tab.id! },
     func: () => ({
       active: !!window.__privacyShield,
-      modern: window.__privacyShield?.version === 2,
+      modern: window.__privacyShield?.version === 3,
     }),
   });
   if (status[0]?.result?.active && !status[0]?.result?.modern)
@@ -132,7 +134,7 @@ export async function maskReport(): Promise<MaskReport | null> {
   const result = await chrome.scripting.executeScript({
     target: { tabId: tab.id! },
     func: () =>
-      window.__privacyShield?.version === 2
+      window.__privacyShield?.version === 3
         ? window.__privacyShield.report()
         : null,
   });
@@ -240,4 +242,41 @@ export async function countScan() {
   if (!isExtension) return;
   const s = await readSettings();
   if (s.activity) await saveSettings({ counts: (Number(s.counts) || 0) + 1 });
+}
+
+export async function prepareSemanticPage() {
+  const tab = await currentTab();
+  const results = await chrome.scripting.executeScript({
+    target: { tabId: tab.id! },
+    func: async () => window.__privacyShield?.semanticPrepare(),
+  });
+  if (!results[0]?.result)
+    throw new Error("Turn protection on before semantic review.");
+  return { ...results[0].result, tabId: tab.id! };
+}
+export async function applySemanticPage(
+  tabId: number,
+  nonce: string,
+  payload: unknown,
+  reviewed: string[],
+  remember: boolean,
+) {
+  const results = await chrome.scripting.executeScript({
+    target: { tabId },
+    func: async (n: string, p: unknown, r: string[], cache: boolean) => {
+      try {
+        return await window.__privacyShield?.semanticApply(n, p, r, cache);
+      } catch {
+        return {
+          error:
+            "Page changed or response invalid. Scan again; existing protection remains active.",
+        };
+      }
+    },
+    args: [nonce, payload, reviewed, remember],
+  });
+  const result = results[0]?.result;
+  if (!result || "error" in result)
+    throw new Error(result?.error ?? "Protection is no longer active.");
+  return result.report;
 }

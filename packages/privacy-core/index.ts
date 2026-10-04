@@ -23,6 +23,12 @@ export interface Result {
 const rules: { kind: Kind; re: RegExp; group?: number; reason: string }[] = [
   {
     kind: "PERSON_NAME",
+    re: /(?:^|[\r\n;|])[ \t]*(?:name|first[ \t]+name|last[ \t]+name|given[ \t]+name|surname|display[ \t]+name|account[ \t]+holder)[ \t]*[:=：][ \t]*(?:\r?\n[ \t]*)?([^\r\n,;|]+)/gimu,
+    group: 1,
+    reason: "Explicit personal-name field",
+  },
+  {
+    kind: "PERSON_NAME",
     re: /\b(?:(?:candidate|applicant|father|mother|guardian|employee)(?:'s)?\s+(?:full\s+)?name(?:\s+entered[^:\n\t]{0,60})?|full\s+name|name\s+(?:as|on)\s+(?:aadha?r|adha?r|passport))\s*[:=\t]\s*([^\n;|]+)/gi,
     group: 1,
     reason: "Labelled personal name",

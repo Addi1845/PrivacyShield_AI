@@ -21,6 +21,8 @@ import {
   type MaskReport,
 } from "./runtime";
 import { watchStatus, setShareWatch } from "./share-watch";
+import { SemanticReview } from "./semantic-review";
+import { prepareSemanticPage, applySemanticPage } from "./runtime";
 import { FieldReview } from "./field-review";
 
 const defaultOptions: MaskOptions = {
@@ -507,6 +509,35 @@ export function MeetingGuide({
                   Clear manual areas
                 </button>
               </div>
+              {!!report.semanticMatches && (
+                <div>
+                  <p>{report.semanticMatches} contextual protection matches</p>
+                  <ul>
+                    {report.semanticCategories?.map((entry) => (
+                      <li key={entry.category}>
+                        {entry.category}: {entry.count}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              <SemanticReview
+                purpose="prepare this page for screen sharing"
+                allowCache
+                onNotice={onNotice}
+                prepare={prepareSemanticPage}
+                apply={async (snapshot, decisions, reviewed, remember) => {
+                  const next = await applySemanticPage(
+                    snapshot.tabId,
+                    snapshot.nonce,
+                    { elements: decisions },
+                    reviewed,
+                    remember,
+                  );
+                  setReport(next);
+                  setChecked(false);
+                }}
+              />
               <FieldReview
                 onNotice={onNotice}
                 onReport={(next) => {

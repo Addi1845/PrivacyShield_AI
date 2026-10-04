@@ -1,3 +1,6 @@
+import { SemanticReview } from "./semantic-review";
+import { semanticOcrCandidates, splitOcrColumns } from "./semantic-ocr";
+import { confidencePolicy, priority } from "../../../packages/semantic-core";
 import React, { useRef, useState, useEffect } from "react";
 import { createWorker } from "tesseract.js";
 import { detect } from "../../../packages/privacy-core";
@@ -17,6 +20,7 @@ export function Screenshot() {
     [reviewed, setReviewed] = useState(false);
   const worker = useRef<Awaited<ReturnType<typeof createWorker>> | null>(null),
     generation = useRef(0);
+  const [ocrLines, setOcrLines] = useState<OcrLine[]>([]);
   const [treatment, setTreatment] = useState<"blur" | "hide">("hide");
   const draw = () => {
     const c = canvas.current,
@@ -51,6 +55,7 @@ export function Screenshot() {
   );
   const load = (url: string) => {
     const loadToken = ++generation.current;
+    setOcrLines([]);
     void worker.current?.terminate();
     worker.current = null;
     setBusy(false);
@@ -78,6 +83,7 @@ export function Screenshot() {
   async function ocr() {
     if (!canvas.current) return;
     const token = ++generation.current;
+    setOcrLines([]);
     setBusy(true);
     setReviewed(false);
     setNote("Reading locally with packaged OCR. No image upload.");
@@ -119,8 +125,9 @@ export function Screenshot() {
       for (const block of result.data.blocks ?? [])
         for (const para of block.paragraphs)
           for (const line of para.lines) {
-            lines.push(line);
+            lines.push(...splitOcrColumns(line));
           }
+      setOcrLines(lines);
       const secretRows = new Set(
         sensitiveOcrLines(
           lines,
@@ -264,6 +271,43 @@ export function Screenshot() {
       <p role="status" className="notice">
         {note}
       </p>
+      {loaded && ocrLines.length > 0 && (
+        <SemanticReview
+          key={generation.current}
+          purpose="redact local OCR"
+          onNotice={setNote}
+          prepare={async () => ({
+            ...semanticOcrCandidates(ocrLines),
+            nonce: String(generation.current),
+            localCount: boxes.length,
+          })}
+          apply={async (snapshot, decisions, reviewedIds) => {
+            if (snapshot.nonce !== String(generation.current))
+              throw new Error("Image changed. Run OCR again.");
+            const found: Box[] = [];
+            for (const d of decisions) {
+              if (
+                !reviewedIds.includes(d.id) &&
+                priority[confidencePolicy(d).action] < priority.ALIAS
+              )
+                continue;
+              for (const line of snapshot.rows.get(d.id) ?? []) {
+                const b = line.bbox;
+                found.push({
+                  x: Math.max(0, b.x0 - 4),
+                  y: Math.max(0, b.y0 - 4),
+                  w: b.x1 - b.x0 + 8,
+                  h: b.y1 - b.y0 + 8,
+                  forceHide:
+                    d.category === "AUTH_SECRET" || d.action === "HIDE",
+                });
+              }
+            }
+            setBoxes((old) => [...old, ...found]);
+            setReviewed(false);
+          }}
+        />
+      )}
       {!loaded && (
         <div className="image-empty">
           <span className="large-icon">▧</span>

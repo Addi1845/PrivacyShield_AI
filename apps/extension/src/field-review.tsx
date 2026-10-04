@@ -46,9 +46,9 @@ export function FieldReview({
       {snapshot && (
         <>
           <p className="context-help">
-            These are the exact labels the configured processor (Groq) will
-            receive. Labels themselves can carry confidential context; inspect
-            them first.
+            These are the exact labels the configured AI provider will receive.
+            Labels themselves can carry confidential context; inspect them
+            first.
           </p>
           <ul>
             {snapshot.fields.map((field) => (

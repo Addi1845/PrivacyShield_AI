@@ -4,8 +4,12 @@ export function validateReview(body: unknown): boolean;
 export function validateMinimize(body: unknown): boolean;
 export function validateFields(body: unknown): boolean;
 export function createApi(options?: {
+  provider?: "groq" | "openrouter";
+  timeoutMs?: number;
   key?: string;
   model?: string;
   origin?: string;
   providerFetch?: (url: string, options: RequestInit) => Promise<Response>;
 }): Server;
+
+export function validateElements(body: unknown): boolean;

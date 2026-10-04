@@ -105,6 +105,77 @@ export async function captureContext(
         current.push(value);
         groups.set(group, current);
       }
+      // Self-contained because Chrome serializes this capture function.
+      const captureLabel = (source: Element): string | undefined => {
+        const phrase = (node: Element | null) =>
+          node?.textContent
+            ?.replace(/\s+/g, " ")
+            .trim()
+            .replace(/[.:：]\s*$/, "") ?? "";
+        const labelLike = (node: Element) =>
+          node.matches(
+            "label,b,strong,dt,[data-field-label],[role=rowheader]",
+          ) || /(?:^|[-_\s])(label|caption)(?:$|[-_\s])/i.test(node.className);
+        let element = source;
+        for (let depth = 0; depth < 4; depth++) {
+          const aria = element.getAttribute("aria-label");
+          if (aria && aria.length <= 120) return aria;
+          const labelled = element.getAttribute("aria-labelledby");
+          if (labelled) {
+            const label = labelled
+              .split(/\s+/)
+              .map((id) => phrase(document.getElementById(id)))
+              .join(" ")
+              .trim();
+            if (label && label.length <= 120) return label;
+          }
+          let prior = element.previousElementSibling;
+          while (
+            prior &&
+            (prior.matches("br,svg,[aria-hidden=true]") || !phrase(prior))
+          )
+            prior = prior.previousElementSibling;
+          const siblings = [...(element.parentElement?.children ?? [])].filter(
+            (node) =>
+              !node.matches("br,svg,[aria-hidden=true]") && phrase(node),
+          );
+          if (
+            prior &&
+            (element.matches("td,th,dd,[role=cell]") ||
+              siblings.length === 2 ||
+              labelLike(prior))
+          ) {
+            const label = phrase(prior);
+            if (label && label.length <= 120) return label;
+          }
+          const children = [...element.children].filter(
+            (node) =>
+              !node.matches("br,svg,[aria-hidden=true]") && phrase(node),
+          );
+          if (
+            children.length &&
+            children.length <= 3 &&
+            labelLike(children[0]) &&
+            children.filter(labelLike).length === 1 &&
+            phrase(element).length <= 300 &&
+            [...element.childNodes].some(
+              (n) => n.nodeType === Node.TEXT_NODE && n.textContent?.trim(),
+            )
+          )
+            return phrase(children[0]);
+          const parent = element.parentElement;
+          if (
+            !parent ||
+            parent.matches("main,article,section,body,html") ||
+            [...parent.children].filter(
+              (node) =>
+                !node.matches("br,svg,[aria-hidden=true]") && phrase(node),
+            ).length !== 1
+          )
+            break;
+          element = parent;
+        }
+      };
       const sections = new Map<Element, string>();
       const entries = [...groups.entries()]
         .map(([element, values]) => {
@@ -122,11 +193,7 @@ export async function captureContext(
               "[data-private],[data-context-private],[data-privacyshield-ai-private]",
             )
               ? "Private field"
-              : element.matches("td,th,dd,[role=cell]")
-                ? (element.previousElementSibling?.textContent ?? "")
-                    .trim()
-                    .slice(0, 350)
-                : undefined,
+              : captureLabel(element),
           };
         })
         .filter((entry) => entry.text);

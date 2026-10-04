@@ -1,4 +1,4 @@
-# Privacy policy — local prototype 0.6.0
+# Privacy policy — local prototype 0.7.2
 
 PrivacyShield reads supported webpage text when you choose a capture or turn on presentation protection. It does not inspect a website's backend, cookies, browser history or files. There is no analytics, advertising, microphone recording, remote OCR or automatic content upload. The extension does not record your screen.
 
@@ -8,11 +8,13 @@ Ask privately accepts highlighted text, an outlined element/section, a dragged t
 
 Text, task, preview and screenshots stay in session memory. Clear or close the UI to discard them. Presentation masking keeps original text/styles in content-script memory until stopped or the source tab reloads. The source website still has its original values. Blur and hide are visual treatments, not deletion, encryption or a restriction on the website's own scripts. Blur can leave clues; credentials receive Hide even in Blur mode. Screenshot exports contain altered pixels; blur is weaker than an opaque cover.
 
-Only preferences, onboarding and an optional aggregate count enter local storage. User-enabled sharing reminders persist site match patterns in Chrome's registered-content-script settings, along with granted site permissions. These patterns are configuration, not browsing history. No capture pixels, audio or chosen surface content are collected by reminders.
+Preferences, onboarding, an optional aggregate count and optionally confirmed semantic field meanings enter local storage. Semantic meanings use hashes of normalized labels, categories/actions and 30-day expiry times, bounded to 100 entries. No values, source text or URLs are stored in this cache. Label hashes are not encryption and may be guessed for common labels. Clear the cache in Settings; current session masks remain until stopped. User-enabled sharing reminders persist site match patterns in Chrome's registered-content-script settings, along with granted site permissions. These patterns are configuration, not browsing history. No capture pixels, audio or chosen surface content are collected by reminders.
 
 ## Optional external AI processing
 
-The optional relevance check sends the included, locally sanitized blocks and sanitized task through a local backend to **Groq's API**. The optional presentation field review sends only the displayed, consented field-label list and opaque field IDs. Known sensitive labels are generalized; unknown labels are locally sanitized and shown before consent. Field values, photos, screenshots, excluded blocks and page URLs are not part of these requests. Labels themselves can reveal confidential context; inspect them. Pattern/schema checks cannot guarantee that every label or selected fact is nonprivate.
+The optional relevance check sends the included, locally sanitized blocks and sanitized task through a local backend to the configured provider (**Groq** by default; optional **OpenRouter** configuration). The optional presentation field review sends only the displayed, consented field-label list and opaque field IDs. Known sensitive labels are generalized; unknown labels are locally sanitized and shown before consent. Field values, photos, screenshots, excluded blocks and page URLs are not part of these requests. Labels themselves can reveal confidential context; inspect them. Pattern/schema checks cannot guarantee that every label or selected fact is nonprivate.
+
+The semantic scan sends only reviewed short labels, opaque IDs, a fixed purpose and `[VALUE_WITHHELD]` markers to /classify-elements. It does not send actual source values, DOM, selectors, URLs or images. OCR contributes only separate label candidates after local recognition. Unknown prose without a safe label stays local. Labels can still disclose context, so inspecting the exact request is essential.
 
 Each request requires user consent. AI returns existing block/field IDs only; it cannot retrieve more page content or invent replacement facts. Field review adds covers and does not remove existing local protection. API keys stay in the private backend environment and are not bundled. Request content is not logged. Provider processing/retention follows its terms; zero provider retention is not promised.
 

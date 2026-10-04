@@ -7,6 +7,30 @@ import {
 } from "../../packages/privacy-core";
 import { checkUrl, checkMessage } from "../../packages/threat-core";
 describe("Local privacy engine", () => {
+  it.each([
+    "Name:Aditya",
+    "Name : Aditya",
+    "name:aditya",
+    "NAME=Aditya",
+    "Name：आदित्य",
+    "First name: Aditya",
+    "Surname: Patil",
+    "Name:\nAditya",
+  ])("handles explicit single-name fields: %s", (source) => {
+    const result = sanitize(source, true);
+    expect(result.detections.some((d) => d.kind === "PERSON_NAME")).toBe(true);
+    expect(result.sanitizedText).toContain("REDACTED_PRIVATE");
+    expect(validateOutput(source, result.sanitizedText)).toBe(true);
+    expect(validateOutput(source, source)).toBe(false);
+  });
+  it("preserves product labels and separates adjacent personal fields", () => {
+    expect(
+      sanitize("Product name: Laptop\nProject name: Public Demo").detections,
+    ).toHaveLength(0);
+    expect(sanitize("Name:Aditya; Price: ₹65,000", true).sanitizedText).toBe(
+      "Name:[REDACTED_PRIVATE]; Price: ₹65,000",
+    );
+  });
   it("PRIV-001/003: consistent entities and preserved amounts", () => {
     const r = sanitize(sample);
     expect(r.sanitizedText).toContain("₹2,500");

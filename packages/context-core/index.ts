@@ -1,4 +1,5 @@
 import { detect, sanitize, validateOutput } from "../privacy-core";
+import { localDecision, priority } from "../semantic-core";
 import { classifyField } from "../field-core";
 
 export type ContextBlock = {
@@ -7,6 +8,7 @@ export type ContextBlock = {
   section?: string;
   heading?: boolean;
   fieldLabel?: string;
+  semanticPrivate?: boolean;
 };
 export type ContextCapture = {
   blocks: ContextBlock[];
@@ -83,7 +85,16 @@ export function prepareChoices(
   );
   return capture.blocks.map((block, index) => {
     const result = sanitize(block.text, true);
+    const semantic = localDecision({
+      id: "e0",
+      text: block.text,
+      label: block.fieldLabel,
+    });
     const locked =
+      block.semanticPrivate === true ||
+      (Boolean(block.fieldLabel) &&
+        priority[semantic.action] >= priority.MASK) ||
+      semantic.category === "CONFIDENTIAL_WORK" ||
       Boolean(block.fieldLabel && classifyField(block.fieldLabel)) ||
       identityField.test(block.text) ||
       chromeText.test(block.text) ||

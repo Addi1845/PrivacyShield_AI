@@ -2,6 +2,7 @@ import {
   classifyField,
   type FieldCategory,
 } from "../../../packages/field-core";
+import { extractSemanticPage } from "./semantic-page";
 export type PageField = {
   element: HTMLElement;
   category: FieldCategory;
@@ -55,6 +56,15 @@ export function pageFields(root: Document | ShadowRoot): PageField[] {
       category: rule.category,
       label: rule.description,
     });
+  }
+  for (const { candidate, element } of extractSemanticPage(root)) {
+    const rule = classifyField(candidate.label ?? "");
+    if (rule)
+      fields.set(element, {
+        element,
+        category: rule.category,
+        label: rule.description,
+      });
   }
   return [...fields.values()];
 }

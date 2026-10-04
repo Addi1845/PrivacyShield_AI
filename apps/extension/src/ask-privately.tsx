@@ -1,3 +1,9 @@
+import { SemanticReview } from "./semantic-review";
+import {
+  reduceCandidate,
+  confidencePolicy,
+  priority,
+} from "../../../packages/semantic-core";
 import { useEffect, useRef, useState } from "react";
 import {
   ArrowUpRight,
@@ -131,8 +137,8 @@ export function AskPrivately({
           ...capture,
           omitted: capture.omitted + next.omitted,
           blocks: [...capture.blocks, ...additions].map((b, index) => ({
+            ...b,
             id: `b${index}`,
-            text: b.text,
           })),
         };
         if (
@@ -524,6 +530,66 @@ export function AskPrivately({
                 Rebuild preview
               </button>
             </div>
+            <SemanticReview
+              key={JSON.stringify(
+                capture?.blocks.map(({ id, text, fieldLabel }) => ({
+                  id,
+                  text,
+                  fieldLabel,
+                })),
+              )}
+              purpose="minimize selected context"
+              onNotice={onNotice}
+              prepare={async () => {
+                const mapping: Record<string, string> = {};
+                const elements = choices
+                  .filter((b) => !b.locked)
+                  .flatMap((b) => {
+                    const id = `e${Object.keys(mapping).length}`;
+                    const reduced = reduceCandidate({
+                      id,
+                      text: b.text,
+                      label: b.fieldLabel,
+                    });
+                    if (!reduced || Object.keys(mapping).length >= 50)
+                      return [];
+                    mapping[id] = b.id;
+                    return [reduced];
+                  });
+                return {
+                  nonce: JSON.stringify(capture),
+                  elements,
+                  mapping,
+                  localCount: choices.filter((b) => b.locked).length,
+                };
+              }}
+              apply={async (snapshot, decisions, reviewed) => {
+                if (!capture || snapshot.nonce !== JSON.stringify(capture))
+                  throw new Error("Context changed. Prepare a new review.");
+                const protectedIds = new Set(
+                  decisions
+                    .filter(
+                      (d) =>
+                        reviewed.includes(d.id) ||
+                        priority[confidencePolicy(d).action] >= priority.ALIAS,
+                    )
+                    .map((d) => snapshot.mapping[d.id]),
+                );
+                const next = {
+                  ...capture,
+                  blocks: capture.blocks.map((b) => ({
+                    ...b,
+                    semanticPrivate:
+                      b.semanticPrivate || protectedIds.has(b.id),
+                  })),
+                };
+                generation.current++;
+                abort.current?.abort();
+                setBusy(false);
+                setCapture(next);
+                update(prepareChoices(next, task));
+              }}
+            />
             <details className="context-ai-check">
               <summary>
                 <ScanLine size={15} />
@@ -535,7 +601,7 @@ export function AskPrivately({
                 facts or collect more page content.
               </p>
               <p className="context-help">
-                The configured processor is Groq, used only as infrastructure.
+                The backend uses Groq by default, or OpenRouter if configured.
                 This check sends the included draft to its API; unrecognized
                 sensitive context could remain. No API setup is needed in this
                 screen.

@@ -2,6 +2,20 @@ import { sanitize } from "../../../packages/privacy-core";
 import { pageFields, pageFieldCandidates } from "./page-fields";
 import { classifyField } from "../../../packages/field-core";
 
+import {
+  extractSemanticPage,
+  reducedPageBatch,
+  pageFingerprint,
+} from "./semantic-page";
+import {
+  localDecision,
+  parseDecisions,
+  mergeDecisions,
+  priority,
+  type SemanticDecision,
+} from "../../../packages/semantic-core";
+import { cachedMeaning, loadMeanings, rememberMeaning } from "./semantic-cache";
+
 type MaskConfig = {
   treatment?: "replace" | "blur" | "hide";
   detected: boolean;
@@ -12,6 +26,8 @@ type MaskConfig = {
 };
 type MaskReport = {
   treatment: "replace" | "blur" | "hide";
+  semanticMatches?: number;
+  semanticCategories?: { category: string; count: number }[];
   structuredFields: number;
   fieldTypes: { label: string; count: number }[];
   active: boolean;
@@ -38,6 +54,17 @@ declare global {
       cancelPick: () => void;
       undoManual: () => void;
       clearManual: () => void;
+      semanticPrepare: () => Promise<{
+        nonce: string;
+        elements: import("../../../packages/semantic-core").ReducedCandidate[];
+        localCount: number;
+      }>;
+      semanticApply: (
+        nonce: string,
+        payload: unknown,
+        reviewed: string[],
+        remember: boolean,
+      ) => Promise<{ report: MaskReport }>;
       fieldLabels: () => {
         nonce: string;
         fields: { id: string; label: string }[];
@@ -71,6 +98,7 @@ if (window.__privacyShield) {
     | "avatar"
     | "preview"
     | "manual"
+    | "semantic"
     | "structured"
     | "detected"
     | "contact";
@@ -83,6 +111,14 @@ if (window.__privacyShield) {
     values: Map<string, HTMLElement>;
   } | null = null;
   const aiFields = new Set<HTMLElement>();
+  const semanticMasks = new Map<HTMLElement, SemanticDecision>();
+  const meanings = new Map<string, SemanticDecision>();
+  let semanticSnapshot: {
+    nonce: string;
+    batch: ReturnType<typeof reducedPageBatch>;
+  } | null = null;
+  let savedMeanings: Awaited<ReturnType<typeof loadMeanings>> = {};
+  const checkedLabels = new Set<string>();
   const aliases = new Map<string, string>();
   const visualValues = new Map<string, string>();
   const syntheticNames = [
@@ -344,13 +380,66 @@ if (window.__privacyShield) {
             conceal(img, "avatar");
         }
     }
+    if (config.detected) {
+      for (const entry of extractSemanticPage(root)) {
+        const hard = localDecision(entry.candidate);
+        const label = entry.candidate.label ?? "";
+        if (
+          label &&
+          Object.keys(savedMeanings).length &&
+          !checkedLabels.has(label) &&
+          checkedLabels.size < 500
+        ) {
+          checkedLabels.add(label);
+          void cachedMeaning(label, savedMeanings)
+            .then((cached) => {
+              if (!active || !cached) return;
+              meanings.set(label.toLowerCase(), {
+                ...cached,
+                id: hard.id,
+                confidence: 1,
+              });
+              rescan();
+            })
+            .catch(() => {});
+        }
+        const learned = meanings.get(label.toLowerCase());
+        const decision = mergeDecisions(
+          hard,
+          learned ? { ...learned, id: hard.id } : undefined,
+        );
+        if (
+          (entry.candidate.label ||
+            decision.category === "CONFIDENTIAL_WORK") &&
+          priority[decision.action] >= priority.MASK
+        )
+          semanticMasks.set(entry.element, decision);
+      }
+    }
+    for (const [element, decision] of semanticMasks) {
+      if (!element.isConnected) {
+        semanticMasks.delete(element);
+        continue;
+      }
+      replaceAttribute(element, "data-privacyshield-ai-private", "");
+      conceal(element, "semantic", decision.action === "HIDE");
+    }
     scanWhatsApp(root);
     scanDetectedText(root);
     if (config.fields)
       for (const field of root.querySelectorAll<HTMLElement>(
         "input:not([type=button]):not([type=submit]):not([type=reset]):not([type=checkbox]):not([type=radio]):not([type=range]):not([type=color]),textarea,select,[contenteditable]",
       ))
-        conceal(field, "field");
+        conceal(
+          field,
+          "field",
+          field.matches("input[type=password]") ||
+            classifyField(
+              field.getAttribute("autocomplete") ??
+                field.getAttribute("name") ??
+                "",
+            )?.category === "SECRET",
+        );
     for (const element of root.querySelectorAll("*"))
       if (element.shadowRoot) {
         scanRoot(element.shadowRoot);
@@ -367,6 +456,14 @@ if (window.__privacyShield) {
         childList: true,
         subtree: true,
         characterData: true,
+        attributes: true,
+        attributeFilter: [
+          "aria-label",
+          "aria-labelledby",
+          "hidden",
+          "aria-hidden",
+          "class",
+        ],
       });
   };
 
@@ -381,6 +478,14 @@ if (window.__privacyShield) {
       childList: true,
       subtree: true,
       characterData: true,
+      attributes: true,
+      attributeFilter: [
+        "aria-label",
+        "aria-labelledby",
+        "hidden",
+        "aria-hidden",
+        "class",
+      ],
     });
   };
 
@@ -457,6 +562,18 @@ if (window.__privacyShield) {
   };
   const report = (): MaskReport => ({
     treatment: config.treatment ?? "replace",
+    semanticMatches: [...semanticMasks.keys()].filter((e) => e.isConnected)
+      .length,
+    semanticCategories: [
+      ...new Set([...semanticMasks.values()].map((d) => d.category)),
+    ]
+      .map((category) => ({
+        category: category.toLowerCase().replaceAll("_", " "),
+        count: [...semanticMasks].filter(
+          ([e, d]) => e.isConnected && d.category === category,
+        ).length,
+      }))
+      .filter((entry) => entry.count > 0),
     fieldTypes: [...new Set([...structuredLabels.values()])]
       .map((label) => ({
         label,
@@ -492,6 +609,7 @@ if (window.__privacyShield) {
     restoreTextKind("detected");
     restoreTextKind("contact");
     for (const kind of [
+      "semantic",
       "structured",
       "detected",
       "contact",
@@ -564,6 +682,104 @@ if (window.__privacyShield) {
     fieldSnapshot = null;
     return { report: report() };
   };
+  const semanticPrepare = async () => {
+    const entries = extractSemanticPage(document);
+    const cache = await loadMeanings();
+    if (!active) throw new Error("Protection was turned off. Scan again.");
+    for (const entry of entries) {
+      if (
+        !entry.element.isConnected ||
+        pageFingerprint(entry.element) !== entry.fingerprint
+      )
+        continue;
+      const cached = await cachedMeaning(entry.candidate.label ?? "", cache);
+      if (
+        cached &&
+        active &&
+        entry.element.isConnected &&
+        pageFingerprint(entry.element) === entry.fingerprint
+      ) {
+        const decision = mergeDecisions(localDecision(entry.candidate), {
+          ...cached,
+          id: entry.candidate.id,
+          confidence: 1,
+        });
+        semanticMasks.set(entry.element, decision);
+        meanings.set(entry.candidate.label!.toLowerCase(), decision);
+      }
+    }
+    rescan();
+    const batch = reducedPageBatch(
+      entries.filter((e) => !semanticMasks.has(e.element)),
+    );
+    semanticSnapshot = { nonce: crypto.randomUUID(), batch };
+    return {
+      nonce: semanticSnapshot.nonce,
+      elements: batch.elements,
+      localCount:
+        report().structuredFields + report().detectedText + semanticMasks.size,
+    };
+  };
+  const semanticApply = async (
+    nonce: string,
+    payload: unknown,
+    reviewed: string[],
+    remember: boolean,
+  ) => {
+    const snapshot = semanticSnapshot;
+    if (!snapshot || snapshot.nonce !== nonce || !active)
+      throw new Error("Page review expired. Scan again.");
+    const decisions = parseDecisions(
+      payload,
+      snapshot.batch.elements.map((e) => e.id),
+    );
+    if (
+      new Set(reviewed).size !== reviewed.length ||
+      reviewed.some((id) => !decisions.some((d) => d.id === id))
+    )
+      throw new Error("Invalid reviewed IDs");
+    for (const entries of snapshot.batch.groups.values())
+      for (const entry of entries)
+        if (
+          !entry.element.isConnected ||
+          pageFingerprint(entry.element) !== entry.fingerprint
+        )
+          throw new Error("Page changed. Review new labels before applying.");
+    semanticSnapshot = null;
+    const toRemember: { label: string; decision: SemanticDecision }[] = [];
+    for (const d of decisions) {
+      const entries = snapshot.batch.groups.get(d.id)!;
+      const proposed = reviewed.includes(d.id)
+        ? {
+            ...d,
+            action:
+              d.category === "AUTH_SECRET"
+                ? ("HIDE" as const)
+                : ("MASK" as const),
+            confidence: 1,
+          }
+        : d;
+      const decision = mergeDecisions(
+        localDecision({ ...entries[0].candidate, id: d.id }),
+        proposed,
+      );
+      if (priority[decision.action] < priority.ALIAS) continue;
+      // Alias falls back to masking: model-generated replacement text is forbidden.
+      const applied = {
+        ...decision,
+        action:
+          decision.action === "HIDE" ? ("HIDE" as const) : ("MASK" as const),
+      };
+      for (const entry of entries) semanticMasks.set(entry.element, applied);
+      const label = snapshot.batch.elements.find((e) => e.id === d.id)!.label;
+      meanings.set(label.toLowerCase(), applied);
+      if (remember) toRemember.push({ label, decision: applied });
+    }
+    rescan();
+    for (const item of toRemember)
+      await rememberMeaning(item.label, item.decision).catch(() => {});
+    return { report: report() };
+  };
   const stop = () => {
     active = false;
     clearTimeout(timer);
@@ -575,6 +791,7 @@ if (window.__privacyShield) {
     document.removeEventListener("keydown", key, true);
     restoreTextKind("detected");
     restoreTextKind("contact");
+    restoreKind("semantic");
     restoreKind("field");
     restoreKind("avatar");
     restoreKind("preview");
@@ -592,7 +809,9 @@ if (window.__privacyShield) {
   observe(document);
   rescan();
   window.__privacyShield = {
-    version: 2,
+    version: 3,
+    semanticPrepare,
+    semanticApply,
     stop,
     rescan,
     count: () => originals.size + styled.size,
@@ -610,4 +829,12 @@ if (window.__privacyShield) {
     fieldLabels,
     maskAiFields,
   };
+  void loadMeanings()
+    .then((cache) => {
+      if (active) {
+        savedMeanings = cache;
+        rescan();
+      }
+    })
+    .catch(() => {});
 }

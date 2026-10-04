@@ -1,3 +1,4 @@
+import { clearMeanings } from "./semantic-cache";
 import React, { useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
 import {
@@ -572,6 +573,17 @@ function Preferences({
           }}
         >
           Revoke AI processing access
+        </button>
+        <button
+          onClick={() =>
+            void clearMeanings().then(() =>
+              onNotice(
+                "Saved semantic meanings cleared. Current masks stay active until protection is turned off.",
+              ),
+            )
+          }
+        >
+          Clear semantic cache
         </button>
       </div>
       <div className="capability-grid">
